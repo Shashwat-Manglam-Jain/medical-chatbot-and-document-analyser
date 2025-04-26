@@ -1,0 +1,15 @@
+flask
+langchain
+langchain-community
+langchain-huggingface
+transformers
+sentence-transformers
+faiss-cpu
+textblob
+torch
+#pip install flask langchain transformers sentence-transformers faiss-cpu pytesseract pillow textblob
+#pip install easyocr torch torchvision torchaudio
+
+
+
+

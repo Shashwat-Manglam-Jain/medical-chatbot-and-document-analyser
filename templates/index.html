@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🩺 Medical QA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .line-clamp-4 {
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    mark {
+      padding: 0.2em 0.4em;
+      background-color: #fef3c7;
+      border-radius: 4px;
+      font-weight: 600;
+      color: #92400e;
+    }
+
+    .container {
+      background-color: #f3f4f6;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .card {
+      background-color: #1f2937;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 900px;
+      color: #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+
+    .card-header {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .card-content {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #d1d5db;
+      padding-right: 10px;
+    }
+
+    .toggle-button {
+      color: #3b82f6;
+      cursor: pointer;
+      font-weight: 500;
+      text-decoration: underline;
+      margin-top: 10px;
+    }
+
+    .toggle-button:hover {
+      color: #2563eb;
+    }
+
+    button {
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    .question-form textarea {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 15px;
+      resize: none;
+      font-size: 1rem;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 20px;
+    }
+
+    .question-form button {
+      background-color: #2563eb;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      border: none;
+      cursor: pointer;
+    }
+
+    .question-form button:hover {
+      background-color: #1d4ed8;
+    }
+
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #2563eb;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-top: 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50">
+
+<div class="container">
+  <div class="max-w-3xl mx-auto bg-white m-6 p-6 rounded-2xl shadow-xl">
+    <h1 class="text-3xl font-bold mb-8 text-blue-800">🩺 Medical QA Assistant</h1>
+
+    <div class="question-form">
+      <textarea id="question" placeholder="Ask your medical question..." class="w-full p-4 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      <button type="submit" id="ask-btn">Ask</button>
+    </div>
+
+    <div class="mt-6">
+      <input type="file" id="file-input" accept="image/*" class="mb-4 p-2 border border-gray-300 rounded-md">
+      <button id="analyze-btn" class="p-2 bg-blue-600 text-white rounded-md">Analyze Prescription</button>
+    </div>
+  </div>
+
+  <div id="thinking" class="hidden">
+    <div class="card">
+      <div class="card-header">🔍 Matching context from PDF:</div>
+      <div id="sources" class="card-content space-y-2"></div>
+      <div class="text-center text-lg text-blue-500 mt-4">🧠 Thinking... Please wait.</div>
+      <div class="loader"></div>
+    </div>
+  </div>
+
+  <div id="result" class="mt-10 hidden">
+    <div class="card">
+      <div class="card-header text-xl text-green-600">✅ Answer:</div>
+      <p id="answer" class="text-gray-200"></p>
+    </div>
+  </div>
+
+  <div id="prescription-analysis" class="mt-10 hidden">
+    <div class="card">
+      <div class="card-header text-xl text-yellow-600">🩺 Prescription Analysis:</div>
+      <div id="prescription-extracted-text" class="card-content text-sm leading-relaxed mt-4"></div>
+      <div id="prescription-patient-info" class="card-content text-sm leading-relaxed mt-4"></div>
+      <div id="prescription-medications" class="card-content text-sm leading-relaxed mt-4"></div>
+      <div id="prescription-analysis-text" class="card-content text-sm leading-relaxed mt-4"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const askBtn = document.getElementById("ask-btn");
+const analyzeBtn = document.getElementById("analyze-btn");
+const thinkingDiv = document.getElementById("thinking");
+const resultDiv = document.getElementById("result");
+const sourcesDiv = document.getElementById("sources");
+const prescriptionAnalysisDiv = document.getElementById("prescription-analysis");
+const questionInput = document.getElementById("question");
+const answerText = document.getElementById("answer");
+const prescriptionExtractedText = document.getElementById("prescription-extracted-text");
+const prescriptionPatientInfo = document.getElementById("prescription-patient-info");
+const prescriptionMedications = document.getElementById("prescription-medications");
+const prescriptionAnalysisText = document.getElementById("prescription-analysis-text");
+
+// Handle question submit
+askBtn.addEventListener("click", async (e) => {
+  e.preventDefault();
+  const question = questionInput.value.trim();
+  if (!question) return;
+
+  thinkingDiv.classList.remove("hidden");
+  resultDiv.classList.add("hidden");
+  sourcesDiv.innerHTML = "";
+
+  try {
+    const sourceRes = await fetch("/get_sources", {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: new URLSearchParams({question})
+    });
+    const {sources} = await sourceRes.json();
+
+    const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+
+    sources.forEach((text, idx) => {
+      const card = document.createElement("div");
+      card.className = "card bg-gray-700";
+      const header = document.createElement("div");
+      header.className = "card-header text-lg";
+      header.innerText = `Context Match #${idx + 1}`;
+      const content = document.createElement("div");
+      content.className = "card-content text-sm leading-relaxed line-clamp-4";
+      content.innerHTML = keywords.reduce((acc, keyword) => {
+        const re = new RegExp(`(${keyword})`, "gi");
+        return acc.replace(re, "<mark>$1</mark>");
+      }, text);
+
+      const toggle = document.createElement("button");
+      toggle.className = "toggle-button";
+      toggle.innerText = "Show more";
+      toggle.addEventListener("click", () => {
+        content.classList.toggle("line-clamp-4");
+        toggle.innerText = content.classList.contains("line-clamp-4") ? "Show more" : "Show less";
+      });
+
+      card.appendChild(header);
+      card.appendChild(content);
+      card.appendChild(toggle);
+      sourcesDiv.appendChild(card);
+    });
+
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+
+    const answerRes = await fetch("/get_answer", {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: new URLSearchParams({question})
+    });
+    const {answer} = await answerRes.json();
+    answerText.innerText = answer || "No answer found.";
+    resultDiv.classList.remove("hidden");
+
+  } catch (error) {
+    console.error("Error in question submission:", error);
+    answerText.innerText = "An error occurred while processing your question.";
+    resultDiv.classList.remove("hidden");
+  } finally {
+    thinkingDiv.classList.add("hidden");
+  }
+});
+
+// Handle prescription analysis
+analyzeBtn.addEventListener("click", async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById("file-input");
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  thinkingDiv.classList.remove("hidden");
+  prescriptionAnalysisDiv.classList.add("hidden");
+  prescriptionExtractedText.innerHTML = "";
+  prescriptionPatientInfo.innerHTML = "";
+  prescriptionMedications.innerHTML = "";
+  prescriptionAnalysisText.innerHTML = "";
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/analyze_prescription", {
+      method: "POST",
+      body: formData
+    });
+
+    const {extracted_text, analysis, medications, dosages} = await response.json();
+
+    // Display extracted text
+    if (extracted_text) {
+      prescriptionExtractedText.innerHTML = `<strong>Extracted Text:</strong><br>${extracted_text.replace(/\n/g, '<br>')}`;
+    } else {
+      prescriptionExtractedText.innerHTML = "<strong>Extracted Text:</strong><br>No text extracted.";
+    }
+
+    // Parse patient information (simplified assumption based on common format)
+    let patientInfo = "";
+    if (extracted_text) {
+      const nameMatch = extracted_text.match(/Mr\.?\s+[A-Za-z]+\s+[A-Za-z]+/);
+      const dateMatch = extracted_text.match(/\d{2}\/\d{2}\/\d{2}/);
+      patientInfo = [
+        nameMatch ? `<strong>Name:</strong> ${nameMatch[0]}` : "",
+        dateMatch ? `<strong>Prescription Date:</strong> ${dateMatch[0]} (format: DD/MM/YY)` : "",
+        "<strong>Clinic:</strong> The White Tusk (Dental Clinic)"
+      ].filter(Boolean).join("<br>");
+    }
+    prescriptionPatientInfo.innerHTML = patientInfo || "<strong>Patient Information:</strong><br>No information extracted.";
+
+    // Display medications and dosages
+    if (medications && medications.length) {
+      const medList = medications.map((med, idx) => {
+        const dose = dosages[idx] || "";
+        return `<strong>${med}</strong><br>Instructions: ${med.includes("after") ? "After meals" : med.includes("before") ? "Before meals" : "N/A"}<br>Dosage Schedule: ${dose || "N/A"}<br>Duration: ${med.includes("5days") ? "5 days" : med.includes("1week") ? "1 week" : "N/A"}`;
+      }).join("<br><br>");
+      prescriptionMedications.innerHTML = `<strong>Medications and Dosages:</strong><br>${medList}`;
+    } else {
+      prescriptionMedications.innerHTML = "<strong>Medications and Dosages:</strong><br>No medications extracted.";
+    }
+
+    // Display analysis
+    if (analysis) {
+      prescriptionAnalysisText.innerHTML = `<strong>Analysis Summary:</strong><br>${analysis.replace(/\n/g, '<br>')}`;
+    } else {
+      prescriptionAnalysisText.innerHTML = "<strong>Analysis Summary:</strong><br>No analysis available.";
+    }
+
+    prescriptionAnalysisDiv.classList.remove("hidden");
+
+  } catch (error) {
+    console.error("Error in prescription analysis:", error);
+    prescriptionAnalysisText.innerHTML = "An error occurred while analyzing the prescription.";
+    prescriptionAnalysisDiv.classList.remove("hidden");
+  } finally {
+    thinkingDiv.classList.add("hidden");
+  }
+});
+</script>
+
+</body>
+</html>
