@@ -23,7 +23,7 @@ app = Flask(__name__)
 # Setup vectorstore and QA model
 emb = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 try:
-    vs = FAISS.load_local("faiss_index", emb)
+    vs = FAISS.load_local("faiss_index1", emb)
 except Exception as e:
     logger.error(f"Failed to load FAISS index: {e}")
     raise
